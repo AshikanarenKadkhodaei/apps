@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EXカウンター</title>
+<meta name="theme-color" content="#101D33">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EXカウンター">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#EDF2FA; --panel:#FFFFFF; --panel-2:#F5F8FD; --ink:#13233F; --muted:#5F7392; --line:#D3DDEB;
+  --tap:#1F4F8F; --tap-ink:#FFFFFF; --gold:#E8A91E; --gold-ink:#2A1C00;
+  --win:#1E8A5A; --lose:#C0423A; --boost:#7A4FD6;
+  --shadow:0 1px 2px rgba(19,35,63,.06),0 4px 14px rgba(19,35,63,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D182B; --panel:#162642; --panel-2:#1B2E50; --ink:#EAF1FF; --muted:#8FA6C8; --line:#253B63;
+    --tap:#2C66B5; --tap-ink:#FFFFFF; --gold:#F2C14E; --gold-ink:#2A1C00;
+    --win:#43C08A; --lose:#F07A70; --boost:#A98BF0;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D182B; --panel:#162642; --panel-2:#1B2E50; --ink:#EAF1FF; --muted:#8FA6C8; --line:#253B63;
+  --tap:#2C66B5; --tap-ink:#FFFFFF; --gold:#F2C14E; --gold-ink:#2A1C00;
+  --win:#43C08A; --lose:#F07A70; --boost:#A98BF0;
+  --shadow:none;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  font-weight:500; -webkit-tap-highlight-color:transparent; -webkit-text-size-adjust:100%;
+}
+main{
+  max-width:480px; margin:0 auto;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) 16px calc(env(safe-area-inset-bottom,0px) + 40px);
+}
+button{font:inherit; color:inherit; border:0; background:none; cursor:pointer; touch-action:manipulation}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--gold); outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ヘッダー */
+.top{display:flex; gap:8px; align-items:center}
+.quest-btn{
+  flex:1; min-width:0; display:flex; align-items:center; gap:8px; text-align:left;
+  background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:11px 14px; box-shadow:var(--shadow);
+}
+.quest-btn .qn{flex:1; min-width:0; font-weight:800; font-size:1.05rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.quest-btn .caret{color:var(--muted); font-size:.8rem}
+.gear{
+  width:48px; height:48px; flex:none; display:grid; place-items:center;
+  background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
+}
+.gear svg{width:22px; height:22px}
+
+/* カウンター */
+.counter{margin-top:14px; text-align:center; padding:18px 12px 16px; background:var(--panel); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow)}
+.count-label{color:var(--muted); font-size:.85rem; letter-spacing:.08em}
+.count{font-size:clamp(5rem,28vw,8rem); font-weight:800; line-height:1.02; letter-spacing:-.02em}
+.count small{font-size:.22em; font-weight:700; color:var(--muted); margin-left:.15em; letter-spacing:0}
+.meta{color:var(--muted); font-size:.8rem; margin-top:4px}
+.bump{animation:bump .18s ease-out}
+@keyframes bump{50%{transform:scale(1.07)}}
+@media (prefers-reduced-motion:reduce){.bump{animation:none}}
+
+.boost-toggle{
+  display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:7px 12px 7px 8px;
+  border:1px solid var(--line); border-radius:999px; font-size:.82rem; color:var(--muted); background:var(--panel-2);
+}
+.boost-toggle .sw{width:34px; height:20px; border-radius:999px; background:var(--line); position:relative; transition:background .15s}
+.boost-toggle .sw::after{content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.boost-toggle[aria-pressed="true"]{color:var(--boost); border-color:var(--boost); font-weight:800}
+.boost-toggle[aria-pressed="true"] .sw{background:var(--boost)}
+.boost-toggle[aria-pressed="true"] .sw::after{transform:translateX(14px)}
+
+.cond{display:flex; align-items:center; gap:8px; width:100%; margin-top:10px; padding:9px 12px; text-align:left; background:var(--panel-2); border-radius:12px; font-size:.8rem; line-height:1.45}
+.cond .ct{flex:1; min-width:0}
+.cond .more{color:var(--muted); flex:none}
+.trust{font-size:.66rem; font-weight:800; padding:2px 7px; border-radius:999px; border:1px solid currentColor; white-space:nowrap; flex:none}
+.trust.official{color:var(--win)} .trust.verified{color:var(--tap)} .trust.guess{color:var(--gold)} .trust.unknown{color:var(--muted)} .trust.memo{color:var(--boost)}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .trust.verified{color:#8DB7F2} }
+:root[data-theme="dark"] .trust.verified{color:#8DB7F2}
+.pgroup{margin-top:10px; border:1px solid var(--line); border-radius:14px; padding:0}
+.pgroup summary{padding:12px 14px; font-size:.9rem}
+.pgroup .plist{display:flex; flex-direction:column; gap:6px; padding:0 10px 10px}
+.pitem{display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:10px 12px; border-radius:12px; background:var(--panel-2)}
+.pitem .pn{font-weight:800; flex:none}
+.pitem .pc{flex:1; min-width:0; font-size:.72rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.info-table{width:100%; border-collapse:collapse; font-size:.85rem}
+.info-table th{text-align:left; color:var(--muted); font-weight:700; padding:9px 10px 9px 0; vertical-align:top; white-space:nowrap; width:6.5em}
+.info-table td{padding:9px 0; line-height:1.6}
+.info-table tr + tr{border-top:1px solid var(--line)}
+textarea.memo{min-height:64px; font-size:16px; background:var(--panel-2)}
+
+/* ボタン */
+.tap{
+  display:block; width:100%; margin-top:14px; padding:38px 0;
+  background:var(--tap); color:var(--tap-ink); border-radius:26px;
+  font-size:2rem; font-weight:800; letter-spacing:.04em; box-shadow:0 6px 0 rgba(0,0,0,.22);
+}
+.tap:active{transform:translateY(4px); box-shadow:0 2px 0 rgba(0,0,0,.22)}
+.sub-row{display:grid; grid-template-columns:1fr 2.2fr; gap:10px; margin-top:12px}
+.minus{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:17px 0; font-size:1.1rem; font-weight:700}
+.hit{background:var(--gold); color:var(--gold-ink); border-radius:18px; padding:17px 0; font-size:1.25rem; font-weight:800; box-shadow:0 4px 0 rgba(0,0,0,.18)}
+.hit:active{transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.18)}
+.minus:disabled{opacity:.4; cursor:default}
+
+/* カード */
+.card{margin-top:14px; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:14px 16px; box-shadow:var(--shadow)}
+.card-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+.card-title{font-size:.8rem; color:var(--muted); font-weight:700; letter-spacing:.06em}
+.big{font-size:1.6rem; font-weight:800}
+.big small{font-size:.55em; color:var(--muted); font-weight:700; margin-left:2px}
+.bar{height:10px; border-radius:999px; background:var(--panel-2); border:1px solid var(--line); overflow:hidden; margin-top:10px}
+.bar i{display:block; height:100%; border-radius:999px; background:var(--gold); transition:width .3s}
+.bar.luck i{background:linear-gradient(90deg,var(--gold),#F7D77A)}
+.sub{font-size:.82rem; color:var(--muted); margin-top:8px; line-height:1.55}
+.sub b{color:var(--ink)}
+.link{color:var(--tap); text-decoration:underline; font-size:.85rem; padding:0}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .link{color:#8DB7F2} }
+:root[data-theme="dark"] .link{color:#8DB7F2}
+
+.luck-card.done{border-color:var(--gold)}
+.luck-card.done .big{color:var(--gold)}
+
+.stats{display:grid; grid-template-columns:repeat(4,1fr); margin-top:14px; background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow)}
+.stat{padding:12px 2px; text-align:center; min-width:0}
+.stat:not(:nth-child(4n+1)){border-left:1px solid var(--line)}
+.stat:nth-child(n+5){border-top:1px solid var(--line)}
+.stat b{display:block; font-size:1.2rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.stat span{font-size:.7rem; color:var(--muted)}
+.split{display:flex; gap:8px; margin-top:10px}
+.split div{flex:1; background:var(--panel-2); border-radius:12px; padding:8px 10px; font-size:.8rem; color:var(--muted)}
+.split b{display:block; font-size:1.05rem; color:var(--ink)}
+.split .bt b{color:var(--boost)}
+
+.extras{display:flex; flex-direction:column; gap:8px; margin-top:8px}
+.extra{display:flex; align-items:center; gap:8px}
+.extra .en{flex:1; min-width:0; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.extra .ec{min-width:2.5em; text-align:right; font-weight:800; font-size:1.15rem}
+.pill{width:44px; height:38px; border-radius:12px; background:var(--panel-2); border:1px solid var(--line); font-size:1.1rem; font-weight:800}
+
+h2{font-size:.95rem; margin:24px 4px 6px; display:flex; justify-content:space-between; align-items:baseline}
+h2 span{font-size:.75rem; color:var(--muted); font-weight:600}
+ol{list-style:none; margin:0; padding:0; background:var(--panel); border:1px solid var(--line); border-radius:18px; overflow:hidden; box-shadow:var(--shadow)}
+li{display:flex; align-items:center; gap:10px; padding:10px 8px 10px 14px}
+li + li{border-top:1px solid var(--line)}
+li .n{font-weight:800; font-size:1.1rem; min-width:3.6em}
+li .n small{font-size:.7em; color:var(--muted); font-weight:700}
+li .mid{flex:1; min-width:0}
+li .tags{display:flex; flex-wrap:wrap; gap:4px}
+li .d{display:block; color:var(--muted); font-size:.72rem; margin-top:4px}
+.tag{font-size:.7rem; font-weight:800; padding:2px 7px; border-radius:999px; border:1px solid currentColor; white-space:nowrap}
+.tag.w{color:var(--win)} .tag.l{color:var(--lose)} .tag.u{color:var(--muted)} .tag.b{color:var(--boost)} .tag.g{color:var(--gold)}
+.row-btn{width:34px; height:34px; border-radius:10px; color:var(--muted); display:grid; place-items:center; flex:none}
+.row-btn svg{width:17px; height:17px}
+.empty{color:var(--muted); font-size:.85rem; padding:14px; line-height:1.6}
+
+details{margin-top:24px; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:12px 16px}
+summary{font-weight:800; cursor:pointer; font-size:.95rem}
+details p{color:var(--muted); font-size:.82rem; margin:8px 0; line-height:1.6}
+textarea{width:100%; min-height:100px; font:inherit; font-size:.75rem; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:8px}
+
+/* パネル（下から出る） */
+dialog{
+  border:0; padding:0; margin:auto auto 0; width:100%; max-width:480px; max-height:88vh;
+  background:var(--panel); color:var(--ink); border-radius:24px 24px 0 0;
+  box-shadow:0 -10px 40px rgba(0,0,0,.3);
+}
+dialog[open]{animation:up .2s ease-out}
+@keyframes up{from{transform:translateY(40px); opacity:.4}}
+@media (prefers-reduced-motion:reduce){dialog[open]{animation:none}}
+dialog::backdrop{background:rgba(5,10,20,.55)}
+.sheet{padding:10px 18px calc(env(safe-area-inset-bottom,0px) + 18px); overflow:auto; max-height:88vh}
+.grab{width:40px; height:5px; border-radius:999px; background:var(--line); margin:0 auto 10px}
+.sheet h3{margin:4px 0 14px; font-size:1.15rem; text-align:center}
+.sheet h3 .num{color:var(--gold)}
+.sec{margin-top:16px; font-size:.78rem; color:var(--muted); font-weight:800; letter-spacing:.06em}
+.seg{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.seg button{padding:20px 0; border-radius:16px; border:2px solid var(--line); font-size:1.15rem; font-weight:800; background:var(--panel-2)}
+.seg button[aria-pressed="true"].win{border-color:var(--win); color:var(--win)}
+.seg button[aria-pressed="true"].lose{border-color:var(--lose); color:var(--lose)}
+.stepper{display:flex; align-items:center; justify-content:space-between; background:var(--panel-2); border-radius:14px; padding:6px 6px 6px 14px; margin-top:8px}
+.stepper .v{font-weight:800; font-size:1.2rem}
+.stepper .ctrl{display:flex; gap:6px; align-items:center}
+.check{display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--panel-2); border-radius:14px; margin-top:8px; font-weight:700}
+.check input{width:22px; height:22px; accent-color:var(--gold)}
+.field{display:block; margin-top:8px}
+.field span{display:block; font-size:.8rem; color:var(--muted); margin-bottom:4px}
+.field input{
+  width:100%; font:inherit; font-size:16px; color:var(--ink); background:var(--panel-2);
+  border:1px solid var(--line); border-radius:12px; padding:11px 12px;
+}
+.two{display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end}
+.hint{font-size:.75rem; color:var(--muted); margin-top:6px; line-height:1.55}
+.primary{display:block; width:100%; margin-top:18px; padding:16px 0; border-radius:16px; background:var(--tap); color:var(--tap-ink); font-weight:800; font-size:1.05rem}
+.ghost{display:block; width:100%; margin-top:8px; padding:13px 0; border-radius:14px; background:var(--panel-2); border:1px solid var(--line); font-weight:700}
+.danger-link{display:block; margin:20px auto 0; color:var(--lose); font-size:.85rem; text-decoration:underline}
+.qlist{display:flex; flex-direction:column; gap:8px}
+.qitem{display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:13px 14px; border-radius:14px; border:2px solid var(--line); background:var(--panel-2)}
+.qitem[aria-current="true"]{border-color:var(--gold)}
+.qitem .qn{flex:1; min-width:0; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.qitem .qs{font-size:.75rem; color:var(--muted); white-space:nowrap}
+.add-row{display:flex; gap:8px; margin-top:12px}
+.add-row input{flex:1; min-width:0; font:inherit; font-size:16px; color:var(--ink); background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:11px 12px}
+.add-row button{padding:0 16px; border-radius:12px; background:var(--tap); color:var(--tap-ink); font-weight:800; white-space:nowrap}
+.xlist{display:flex; flex-direction:column; gap:6px; margin-top:8px}
+.xitem{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 14px; background:var(--panel-2); border-radius:12px}
+.xitem span{flex:1; font-weight:700}
+.preview{white-space:pre-wrap; background:var(--panel-2); border-radius:14px; padding:12px 14px; font-size:.9rem; line-height:1.6}
+.share-row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px}
+.share-row button{padding:14px 0; border-radius:14px; font-weight:800}
+.share-row .x{background:var(--ink); color:var(--bg)}
+.share-row .cp{background:var(--panel-2); border:1px solid var(--line)}
+
+/* お知らせ */
+.toast{
+  position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 16px); transform:translate(-50%,140%);
+  width:calc(100% - 32px); max-width:448px; display:flex; align-items:center; gap:8px;
+  background:var(--ink); color:var(--bg); padding:10px 10px 10px 16px; border-radius:16px;
+  box-shadow:0 8px 30px rgba(0,0,0,.35); transition:transform .22s ease; z-index:10; font-size:.9rem;
+}
+.toast.show{transform:translate(-50%,0)}
+.toast .tm{flex:1; min-width:0}
+.toast button{padding:8px 12px; border-radius:10px; font-weight:800; font-size:.85rem; background:rgba(127,127,127,.22); white-space:nowrap}
+.toast .tx{background:var(--gold); color:var(--gold-ink)}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <button class="quest-btn" id="quest-btn" aria-label="クエストを切り替える">
+      <span class="qn" id="qname"></span><span class="caret">▼ 切替</span>
+    </button>
+    <button class="gear" id="gear" aria-label="このクエストの設定">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+
+  <section class="counter" aria-live="polite">
+    <div class="count-label">ハマり（前回のEXから）</div>
+    <div class="count num" id="count">0<small>周</small></div>
+    <div class="meta" id="meta"></div>
+    <button class="boost-toggle" id="boost" aria-pressed="false"><span class="sw"></span><span id="boost-label">確率アップ条件：なし</span></button>
+    <button class="cond" id="cond" hidden></button>
+  </section>
+
+  <button class="tap" id="plus">＋1周</button>
+  <div class="sub-row">
+    <button class="minus" id="minus">−1</button>
+    <button class="hit" id="hit">EX出た！</button>
+  </div>
+
+  <div class="card" id="luck-card"></div>
+  <div class="card" id="luckmeter"></div>
+
+  <div class="stats" id="stats"></div>
+  <div id="split-wrap"></div>
+  <div class="card" id="kinki-card" hidden></div>
+  <div class="card" id="extras-card" hidden></div>
+
+  <h2>出現履歴 <span id="hist-count"></span></h2>
+  <ol id="history"></ol>
+
+  <details>
+    <summary>バックアップ</summary>
+    <p>「書き出す」で全クエストの記録をコピーできます。メモアプリなどに貼って保存しておき、戻すときは下の欄に貼って「読み込む」を押します。<br>記録はこの端末の中だけに保存されています。機種変更の前には必ず書き出してください。</p>
+    <textarea id="bk" aria-label="バックアップデータ"></textarea>
+    <div class="two">
+      <button class="ghost" id="export">書き出す</button>
+      <button class="ghost" id="import">読み込む</button>
+    </div>
+  </details>
+</main>
+
+<!-- EXが出たとき -->
+<dialog id="dlg-hit"><div class="sheet">
+  <div class="grab"></div>
+  <h3>EX遭遇！ <span class="num" id="hit-n"></span>周目</h3>
+  <div class="seg">
+    <button class="win" id="hit-win" aria-pressed="true">勝った</button>
+    <button class="lose" id="hit-lose" aria-pressed="false">負けた</button>
+  </div>
+  <div id="hit-win-opts">
+    <div class="sec">手に入った数（ラック）</div>
+    <div class="stepper"><span>ドロップ</span><div class="ctrl"><button class="pill" id="drop-m" aria-label="減らす">−</button><span class="v num" id="drop-v">1</span><button class="pill" id="drop-p" aria-label="増やす">＋</button></div></div>
+    <div id="hit-kinki">
+      <label class="check"><input type="checkbox" id="hit-shiho">至宝が発動した</label>
+      <label class="check"><input type="checkbox" id="hit-lucky">ラッキーリザルトが出た</label>
+    </div>
+  </div>
+  <button class="primary" id="hit-ok">記録する</button>
+  <button class="ghost" id="hit-cancel">やめる</button>
+</div></dialog>
+
+<!-- クエスト切替 -->
+<dialog id="dlg-quests"><div class="sheet">
+  <div class="grab"></div>
+  <h3>クエストを選ぶ</h3>
+  <div class="qlist" id="qlist"></div>
+  <div class="sec">一覧から追加（確率アップ条件つき）</div>
+  <div id="plist"></div>
+  <p class="hint">攻略サイトで公開されている情報です（<span id="preset-date"></span>時点）。★公式＝公式が発言／検証＝攻略サイトが周回して確認／予想＝噂・予想の段階／不明＝まだ分かっていない。</p>
+  <div class="sec">名前を入れて追加</div>
+  <div class="add-row"><input id="new-q" placeholder="例：ジンロン" maxlength="30" enterkeyhint="done"><button id="new-q-add">追加</button></div>
+  <button class="ghost" data-close>閉じる</button>
+</div></dialog>
+
+<!-- 設定 -->
+<dialog id="dlg-set"><div class="sheet">
+  <div class="grab"></div>
+  <h3>このクエストの設定</h3>
+  <label class="field"><span>クエスト名</span><input id="set-name" maxlength="30"></label>
+
+  <div class="sec">EXが出る確率の目安（％）</div>
+  <div class="two">
+    <label class="field"><span>ふだん</span><input id="set-pn" inputmode="decimal" placeholder="例：1"></label>
+    <label class="field"><span>確率アップ条件あり</span><input id="set-pb" inputmode="decimal" placeholder="例：4"></label>
+  </div>
+  <p class="hint">入れると「今のハマりはどのくらい不運か」が出ます。攻略サイトの目安（多くは0.5〜4％）を入れてください。空欄なら表示しません。</p>
+
+  <div class="sec">確率アップ条件のメモ</div>
+  <label class="field"><textarea class="memo" id="set-cond" maxlength="200" placeholder="例：HP満タンでクリア"></textarea></label>
+  <p class="hint">新しい情報が出たら書き直せます。書き直すと印が「自分のメモ」に変わります。</p>
+
+  <div class="sec">ラック</div>
+  <div class="two">
+    <label class="field"><span>使う前からあったラック</span><input id="set-l0" inputmode="numeric"></label>
+    <label class="field"><span>目標（運極）</span><input id="set-goal" inputmode="numeric"></label>
+  </div>
+
+  <div class="sec">周回数を手で直す</div>
+  <div class="two">
+    <label class="field"><span>いまのハマり</span><input id="set-ham" inputmode="numeric"></label>
+    <label class="field"><span>総周回（条件なし／あり）</span><input id="set-runs" inputmode="numeric" placeholder="120 / 30"></label>
+  </div>
+
+  <label class="check"><input type="checkbox" id="set-kinki">禁忌の獄のEX（至宝・ラッキーリザルトを数える）</label>
+
+  <div class="sec">自分で足す数え項目</div>
+  <div class="xlist" id="xlist"></div>
+  <div class="add-row"><input id="new-x" placeholder="例：2体ドロップ／SS事故" maxlength="20" enterkeyhint="done"><button id="new-x-add">追加</button></div>
+
+  <button class="primary" id="set-save">保存する</button>
+  <button class="ghost" data-close>やめる</button>
+  <button class="danger-link" id="set-reset">このクエストの記録を0に戻す</button>
+  <button class="danger-link" id="set-del">このクエストを削除</button>
+</div></dialog>
+
+<!-- EXの情報 -->
+<dialog id="dlg-info"><div class="sheet">
+  <div class="grab"></div>
+  <h3 id="info-title"></h3>
+  <table class="info-table" id="info-body"></table>
+  <button class="ghost" data-close>閉じる</button>
+</div></dialog>
+
+<!-- 投稿文 -->
+<dialog id="dlg-share"><div class="sheet">
+  <div class="grab"></div>
+  <h3>投稿文</h3>
+  <div class="preview" id="share-text"></div>
+  <div class="share-row">
+    <button class="x" id="share-x">Xに投稿</button>
+    <button class="cp" id="share-copy">コピー</button>
+  </div>
+  <button class="ghost" data-close>閉じる</button>
+</div></dialog>
+
+<div class="toast" id="toast" role="status"><span class="tm" id="toast-msg"></span></div>
+
+<script>
+/* ============================================================
+   EXの一覧（攻略サイトで公開されている情報）
+   ・trust：official＝公式が発言／verified＝攻略サイトが周回して確認／guess＝噂・予想／unknown＝不明
+   ・pn/pb：確率の目安（％）。ふだん／確率アップ条件あり。分からないものは null
+   ・新しいEXが出たらここに1行足す。PRESET_DATE も更新する
+   ============================================================ */
+const PRESET_DATE = "2026年9月21日";
+const G8 = "ゲームエイト「EXステージの出現条件と攻略」（2026年9月14日更新）";
+const PRESETS = [
+  {group:"破界の星墓", items:[
+    {name:"インゼムニア", from:"メラン&コリンの星墓（破界の星墓を全ステージクリア後）", cond:"まだ判明していない", trust:"unknown", pn:null, pb:null, src:G8},
+    {name:"アムネディア", from:"パラノヴィアの星墓（破界の星墓を全ステージクリア後）", cond:"パーティの総ラック100以上（運枠を編成するのでもよい）", trust:"verified", pn:null, pb:4,
+      note:"「編成パーティの総合ラックに応じて出現確率アップ」。条件ありで100周して約4回＝約4％（攻略班の検証）", src:G8},
+  ]},
+  {group:"天魔の孤城・空中庭園", items:[
+    {name:"コルティーナ", from:"空中庭園【10】", cond:"空中庭園を無敗で制覇（1敗ごとに確率が下がると予想）", trust:"verified", pn:0.5, pb:1.5,
+      note:"ふだん約0.5％ → 条件ありで約1.5〜2％（攻略班の検証）", src:G8},
+    {name:"アーキレット", from:"試練の間【10】", cond:"公式「今の環境では、試練10をクリアできる人は無条件で条件を満たしている」", trust:"official", pn:0.5, pb:null,
+      note:"攻略班が953周して5回＝約0.5％。「34ターン以内」「SS4体残し」は古い説", src:"ゲームエイト「アーキレットの確率アップ条件予想」（2026年6月19日更新）"},
+  ]},
+  {group:"禁忌の獄", kinki:true, items:[
+    {name:"不可思議", from:"禁忌の獄 深淵", cond:"深淵を3種類クリアした状態で周回（公式のヒントから）", trust:"official",  pn:null, pb:null,
+      note:"公式が「深淵は1つクリアで25階までスキップできる。ではなぜ3つあるのか」とヒントを出した", src:G8+"／AppBank（2023年10月31日）"},
+    {name:"無量大数", from:"禁忌の獄【裏21】", cond:"スピクリの残りターンが多いほど確率アップ（わくわくの実「スピクリの力」をつける）", trust:"verified", pn:null, pb:null,
+      note:"攻略班が「スピクリの力」つきで回したら明らかに出やすかった。Xでは「6ターン以上残し」という説も", src:G8},
+    {name:"阿頼耶", from:"禁忌の獄【30】", cond:"HP満タンでクリア（ラストゲージの毒に注意）", trust:"verified", pn:null, pb:null, src:G8},
+    {name:"涅槃寂静", from:"禁忌の獄【裏28】", cond:"出てきたらホストを交代して周回（マルチ必須）", trust:"verified", pn:null, pb:null, src:G8},
+    {name:"刹那", from:"禁忌の獄【裏14】【15】【裏19】【20】（周回は裏19がおすすめ）", cond:"HP満タンでクリア", trust:"verified", pn:null, pb:null,
+      note:"Xでは「未確定」とする人もいる", src:G8},
+    {name:"那由他", from:"禁忌の獄【25】", cond:"はっきりしない（クリアターン数が関係？／SS4連続使用という説も）", trust:"guess", pn:null, pb:null, src:G8+"／X（ふくみん氏の投稿）"},
+  ]},
+  {group:"爆絶のEX", items:[
+    {name:"グランディオーソ", from:"アジタート・ノービレ・テンペストーソ・ラルガメンテ・スケルツァンド", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+    {name:"ヴァルハラ", from:"タモアンチャン・桃源郷・パライソ・アアル・極楽浄土", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+    {name:"パズル", from:"ファイト・ストラテジー・ロール・ラブ・クラフト", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+    {name:"ネッテキシ", from:"ディエス・イレ・カリ・ユガ・ドゥームズデイ・末法・ビッグクランチ", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+    {name:"リズム", from:"シューティング・ミステリー・ホラー・レース・カード", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+  ]},
+  {group:"超絶のEX", items:[
+    {name:"ウンエントリヒ", from:"ノイン・フィーア・アハト・ゼクス・アインス", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+    {name:"マガツヒ", from:"オモイカネ・アメノサギリ・ホノイカヅチ・オオクチノマカミ・トヨタマヒメ", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+    {name:"変若水", from:"ネクタル・ソーマ・仙丹・エリクサー・甘露", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+    {name:"ミリアーデ", from:"ツェーン・ツヴァイ・フュンフ・ズィーベン・ドライ", cond:"確率アップ条件は公開されていない", trust:"unknown", pn:null, pb:null, src:G8},
+  ]},
+  {group:"イベントのEX", items:[
+    {name:"ルドシュプネル", from:"新イベントの降臨クエスト", cond:"確率アップ条件は公開されていない", trust:"guess", pn:10, pb:null,
+      note:"確率10％前後は、過去の同じようなEXからの推定", src:G8},
+  ]},
+];
+const TRUST = {official:"公式", verified:"検証", guess:"予想", unknown:"不明", memo:"自分のメモ"};
+function findPreset(name){
+  for(const g of PRESETS) for(const it of g.items) if(it.name === name) return {...it, kinki: !!g.kinki};
+  return null;
+}
+function questFromPreset(pr){
+  return normQuest({name:pr.name, prob:{n:pr.pn, b:pr.pb}, kinki:pr.kinki,
+    info:{from:pr.from, cond:pr.cond, trust:pr.trust, note:pr.note||"", src:pr.src, date:PRESET_DATE}});
+}
+
+/* ============================================================
+   データ
+   ・保存場所：localStorage の "ex-counter-v2"
+   ・旧版 "ex-counter-v1" は消さずに残す（最初の1回だけ写して使う）
+   ・項目を足すときは normQuest() に既定値を1行足すだけでよい
+   ============================================================ */
+const KEY = "ex-counter-v2", OLD_KEY = "ex-counter-v1";
+let state;
+
+function normQuest(q){
+  q = q && typeof q === "object" ? q : {};
+  const n = v => Number.isFinite(+v) && +v >= 0 ? Math.floor(+v) : 0;
+  const p = v => v === null || v === "" || v === undefined || !Number.isFinite(+v) || +v <= 0 || +v > 100 ? null : +v;
+  return {
+    name: String(q.name || "周回クエスト").slice(0,30),
+    hamari: n(q.hamari),
+    runs: {n: n(q.runs && q.runs.n), b: n(q.runs && q.runs.b)},
+    boost: !!q.boost,
+    prob: {n: p(q.prob && q.prob.n), b: p(q.prob && q.prob.b)},
+    goal: n(q.goal) || 99,
+    luck0: n(q.luck0),
+    kinki: !!q.kinki,
+    extras: Array.isArray(q.extras) ? q.extras.filter(x=>x && x.name).map(x=>({name:String(x.name).slice(0,20), c:n(x.c)})) : [],
+    hist: Array.isArray(q.hist) ? q.hist.filter(h=>h && Number.isFinite(+h.n)).map(h=>({
+      n: n(h.n), t: +h.t || Date.now(),
+      w: h.w === true || h.w === false ? h.w : null,   // true=勝ち false=負け null=不明（旧版の記録）
+      d: h.w === true ? Math.max(0, n(h.d === undefined ? 1 : h.d)) : 0,
+      b: !!h.b, s: !!h.s, l: !!h.l
+    })) : [],
+    last: +q.last || null,
+    info: q.info && typeof q.info === "object" && q.info.cond ? {
+      from: String(q.info.from||""), cond: String(q.info.cond).slice(0,200), trust: TRUST[q.info.trust] ? q.info.trust : "memo",
+      note: String(q.info.note||""), src: String(q.info.src||""), date: String(q.info.date||"")
+    } : null
+  };
+}
+function fromV1(old){
+  // 旧版：{current, quests:[{name, count, history:[{n,t}]}]}
+  return {
+    v:2, current: old.current || 0,
+    quests: old.quests.map(q=>{
+      const hist = (q.history||[]).map(h=>({n:h.n, t:h.t, w:null, d:0, b:false}));
+      const past = hist.reduce((a,h)=>a+(+h.n||0),0);
+      return normQuest({name:q.name, hamari:q.count, runs:{n:(+q.count||0)+past, b:0}, hist});
+    })
+  };
+}
+function normState(s){
+  if(s && s.v !== 2 && Array.isArray(s.quests) && s.quests.some(q=>q && "history" in q)) s = fromV1(s);
+  if(!s || !Array.isArray(s.quests) || !s.quests.length) return null;
+  const out = {v:2, quests: s.quests.map(normQuest), current: +s.current || 0};
+  if(!(out.current >= 0 && out.current < out.quests.length)) out.current = 0;
+  return out;
+}
+function load(){
+  let s = null;
+  try{ s = normState(JSON.parse(localStorage.getItem(KEY))); }catch(e){}
+  if(!s){ try{ s = normState(JSON.parse(localStorage.getItem(OLD_KEY))); }catch(e){} }
+  state = s || {v:2, current:0, quests:[normQuest({})]};
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+const q = () => state.quests[state.current];
+
+/* 取り消し用：操作の直前の状態を覚えておく */
+let undoSnap = null;
+function snap(){ undoSnap = JSON.stringify(state); }
+function undo(){
+  if(!undoSnap) return;
+  state = normState(JSON.parse(undoSnap)); undoSnap = null; save(); render(); toast("取り消しました");
+}
+
+/* ============================================================
+   計算
+   ============================================================ */
+function calc(x){
+  const total = x.runs.n + x.runs.b;
+  const enc = x.hist.length;
+  const ns = x.hist.map(h=>h.n);
+  const wins = x.hist.filter(h=>h.w===true), loses = x.hist.filter(h=>h.w===false).length;
+  const luck = x.luck0 + wins.reduce((a,h)=>a+h.d,0);
+  const encB = x.hist.filter(h=>h.b).length;
+  return {
+    total, enc, wins:wins.length, loses, luck,
+    rate: total ? enc/total*100 : null,
+    avg: ns.length ? ns.reduce((a,b)=>a+b,0)/ns.length : null,
+    min: ns.length ? Math.min(...ns) : null,
+    max: ns.length ? Math.max(...ns) : null,
+    rateN: x.runs.n ? (enc-encB)/x.runs.n*100 : null, encN: enc-encB,
+    rateB: x.runs.b ? encB/x.runs.b*100 : null, encB,
+    shiho: wins.filter(h=>h.s).length, lucky: wins.filter(h=>h.l).length
+  };
+}
+const pct = v => v===null ? "–" : (v >= 10 ? v.toFixed(1) : v.toFixed(2)) + "%";
+const esc = s => String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function fmt(t){
+  const d = new Date(t), now = new Date();
+  const hm = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  const md = `${d.getMonth()+1}/${d.getDate()}`;
+  return (d.getFullYear() !== now.getFullYear() ? d.getFullYear()+"/" : "") + md + " " + hm;
+}
+
+/* ============================================================
+   画面
+   ============================================================ */
+const $ = id => document.getElementById(id);
+
+function render(bump){
+  const x = q(), c = calc(x);
+  $("qname").textContent = x.name;
+  const cnt = $("count");
+  cnt.innerHTML = `${x.hamari}<small>周</small>`;
+  if(bump){ cnt.classList.remove("bump"); void cnt.offsetWidth; cnt.classList.add("bump"); }
+  $("meta").textContent = `総周回 ${c.total}` + (x.last ? `　最終 ${fmt(x.last)}` : "");
+  $("minus").disabled = x.hamari === 0;
+  $("boost").setAttribute("aria-pressed", x.boost);
+  $("boost-label").textContent = "確率アップ条件：" + (x.boost ? "満たして周回中" : "なし");
+  const cd = $("cond");
+  cd.hidden = !x.info;
+  if(x.info) cd.innerHTML = `<span class="trust ${x.info.trust}">${TRUST[x.info.trust]}</span><span class="ct">${esc(x.info.cond)}</span><span class="more">›</span>`;
+
+  // ラック
+  const lc = $("luck-card"), done = c.luck >= x.goal;
+  lc.className = "card luck-card" + (done ? " done" : "");
+  // あと何周：残り ÷（1周あたりの遭遇率 × 勝率 × 1勝あたりのドロップ数）
+  let eta = "";
+  if(!done && c.rate && c.wins){
+    const winRate = c.wins / (c.wins + c.loses);
+    const perWin = (c.luck - x.luck0) / c.wins || 1;
+    eta = `（今のペースなら 約 <b>${Math.ceil((x.goal - c.luck) / (c.rate/100 * winRate * perWin))}</b> 周）`;
+  }
+  lc.innerHTML = `
+    <div class="card-head"><span class="card-title">ラック</span>
+      <span class="sub" style="margin:0">勝ち ${c.wins}　負け ${c.loses}</span></div>
+    <div class="big num">${c.luck}<small>/ ${x.goal}</small></div>
+    <div class="bar luck"><i style="width:${Math.min(100, c.luck/x.goal*100)}%"></i></div>
+    <div class="sub">${done ? "🎉 <b>運極達成！</b>" : `運極まで あと <b>${x.goal - c.luck}</b> 体${eta}`}</div>`;
+
+  // 運の良し悪し
+  const lm = $("luckmeter");
+  const p = x.boost && x.prob.b ? x.prob.b : x.prob.n;
+  if(!p && x.prob.b){
+    lm.innerHTML = `<div class="card-title">運の良し悪し</div>
+      <div class="sub">このEXは「確率アップ条件あり」の目安（${x.prob.b}%）だけ分かっています。条件を満たして回すときは、上のスイッチをオンにしてください。</div>`;
+  } else if(!p){
+    lm.innerHTML = `<div class="card-title">運の良し悪し</div>
+      <div class="sub">EXが出る確率の目安を入れると、今のハマりがどのくらい不運かが分かります。
+      <button class="link" id="lm-set">目安を入れる</button></div>`;
+    $("lm-set").onclick = openSettings;
+  } else {
+    const r = p/100;
+    const stay = Math.pow(1-r, x.hamari) * 100;           // ここまで1回も出ない確率
+    const k90 = Math.ceil(Math.log(0.1)/Math.log(1-r));   // 9割の人が出るまでの周回数
+    const word = stay < 5 ? "かなり不運" : stay < 25 ? "不運" : stay < 50 ? "やや不運" : "ふつう";
+    const color = stay < 5 ? "var(--lose)" : stay < 25 ? "var(--gold)" : "var(--win)";
+    lm.innerHTML = `
+      <div class="card-head"><span class="card-title">運の良し悪し（目安 ${p}%${x.boost && x.prob.b ? "・条件あり" : ""}）</span>
+        <span style="font-weight:800;color:${color}">${word}</span></div>
+      <div class="bar"><i style="width:${Math.max(2, 100-stay)}%;background:${color}"></i></div>
+      <div class="sub">${x.hamari ? `${x.hamari}周続けて出ないのは <b>${stay < 0.1 ? "0.1%未満" : stay.toFixed(stay < 10 ? 1 : 0) + "%"}</b> の人だけ。<br>` : ""}
+      平均 <b>${Math.round(1/r)}</b> 周に1回、9割の人は <b>${k90}</b> 周までに出ます。</div>`;
+  }
+
+  // 統計
+  const s = [
+    ["遭遇率", pct(c.rate)], ["総周回", c.total], ["遭遇", c.enc], ["平均", c.avg===null ? "–" : c.avg.toFixed(1)],
+    ["最短", c.min ?? "–"], ["最長", c.max ?? "–"], ["勝ち", c.wins], ["負け", c.loses]
+  ];
+  $("stats").innerHTML = s.map(([k,v])=>`<div class="stat"><b class="num">${v}</b><span>${k}</span></div>`).join("");
+
+  // 条件あり・なしで分けた遭遇率（条件ありで回したことがあるときだけ）
+  $("split-wrap").innerHTML = x.runs.b ? `<div class="split">
+      <div>条件なし<b class="num">${pct(c.rateN)}</b>${c.encN} / ${x.runs.n}周</div>
+      <div class="bt">条件あり<b class="num">${pct(c.rateB)}</b>${c.encB} / ${x.runs.b}周</div></div>` : "";
+
+  // 禁忌
+  const kc = $("kinki-card");
+  kc.hidden = !x.kinki;
+  if(x.kinki){
+    const r2 = v => c.wins ? `${v}回（${(v/c.wins*100).toFixed(1)}%）` : `${v}回`;
+    kc.innerHTML = `<div class="card-title">禁忌EX（勝ったときのうち）</div>
+      <div class="split" style="margin-top:8px"><div>至宝<b class="num">${r2(c.shiho)}</b></div><div>ラッキーリザルト<b class="num">${r2(c.lucky)}</b></div></div>`;
+  }
+
+  // 自分で足した項目
+  const ec = $("extras-card");
+  ec.hidden = !x.extras.length;
+  ec.innerHTML = `<div class="card-title">自分で足した項目</div><div class="extras">` +
+    x.extras.map((e,i)=>`<div class="extra"><span class="en">${esc(e.name)}</span><span class="ec num">${e.c}</span>
+      <button class="pill" data-x="${i}" data-d="-1" aria-label="${esc(e.name)}を減らす">−</button>
+      <button class="pill" data-x="${i}" data-d="1" aria-label="${esc(e.name)}を増やす">＋</button></div>`).join("") + `</div>`;
+  ec.querySelectorAll("[data-x]").forEach(b=>b.onclick = ()=>{
+    const e = x.extras[+b.dataset.x]; e.c = Math.max(0, e.c + +b.dataset.d); save(); render();
+  });
+
+  // 履歴
+  $("hist-count").textContent = c.enc ? `${c.enc}件` : "";
+  const ol = $("history");
+  if(!x.hist.length){
+    ol.innerHTML = `<div class="empty">EXが出たら「EX出た！」を押すと、ここに何周目で出たかが残ります。</div>`;
+  } else {
+    ol.innerHTML = x.hist.map((h,i)=>({h,i})).reverse().map(({h,i})=>`
+      <li><span class="n num">${h.n}<small>周目</small></span>
+        <span class="mid"><span class="tags">
+          ${h.w===true ? `<span class="tag w">勝ち${h.d!==1 ? "×"+h.d : ""}</span>` : h.w===false ? `<span class="tag l">負け</span>` : `<span class="tag u">勝敗不明</span>`}
+          ${h.b ? `<span class="tag b">条件あり</span>` : ""}${h.s ? `<span class="tag g">至宝</span>` : ""}${h.l ? `<span class="tag g">ラキリザ</span>` : ""}
+        </span><span class="d num">${fmt(h.t)}</span></span>
+        <button class="row-btn" data-share="${i}" aria-label="この記録の投稿文"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg></button>
+        <button class="row-btn" data-del="${i}" aria-label="この記録を削除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </li>`).join("");
+    ol.querySelectorAll("[data-del]").forEach(b=>b.onclick = ()=>{
+      const i = +b.dataset.del, h = x.hist[i];
+      snap();
+      x.hist.splice(i,1);
+      // その回の1周も総周回から引く
+      if(h.b) x.runs.b = Math.max(0, x.runs.b-1); else x.runs.n = Math.max(0, x.runs.n-1);
+      save(); render(); toast(`${h.n}周目の記録を消しました`, true);
+    });
+    ol.querySelectorAll("[data-share]").forEach(b=>b.onclick = ()=>openShare(+b.dataset.share));
+  }
+  document.title = `${x.hamari}周｜${x.name}`;
+}
+
+/* ============================================================
+   操作
+   ============================================================ */
+function buzz(ms){ try{ navigator.vibrate && navigator.vibrate(ms); }catch(e){} }
+function addRun(x){ if(x.boost) x.runs.b++; else x.runs.n++; x.last = Date.now(); }
+
+$("plus").onclick = ()=>{ const x = q(); x.hamari++; addRun(x); buzz(15); save(); render(true); };
+$("minus").onclick = ()=>{
+  const x = q(); if(!x.hamari) return;
+  x.hamari--;
+  if(x.boost && x.runs.b) x.runs.b--; else if(x.runs.n) x.runs.n--; else if(x.runs.b) x.runs.b--;
+  save(); render(true);
+};
+$("boost").onclick = ()=>{ const x = q(); x.boost = !x.boost; save(); render(); };
+
+/* パネルの開け閉め */
+function openSheet(d){ d.showModal(); }
+document.querySelectorAll("dialog").forEach(d=>{
+  d.addEventListener("click", e=>{ if(e.target === d) d.close(); });  // 外側を押したら閉じる
+  d.querySelectorAll("[data-close]").forEach(b=>b.onclick = ()=>d.close());
+});
+
+/* EX出た！ */
+let hitWin = true, hitDrop = 1;
+function setHit(){
+  $("hit-win").setAttribute("aria-pressed", hitWin);
+  $("hit-lose").setAttribute("aria-pressed", !hitWin);
+  $("hit-win-opts").hidden = !hitWin;
+  $("drop-v").textContent = hitDrop;
+}
+$("hit").onclick = ()=>{
+  const x = q();
+  hitWin = true; hitDrop = 1;
+  $("hit-n").textContent = x.hamari + 1;   // EXが出たこの周も1周に数える
+  $("hit-kinki").hidden = !x.kinki;
+  $("hit-shiho").checked = $("hit-lucky").checked = false;
+  setHit(); openSheet($("dlg-hit"));
+};
+$("hit-win").onclick = ()=>{ hitWin = true; setHit(); };
+$("hit-lose").onclick = ()=>{ hitWin = false; setHit(); };
+$("drop-m").onclick = ()=>{ hitDrop = Math.max(0, hitDrop-1); setHit(); };
+$("drop-p").onclick = ()=>{ hitDrop = Math.min(9, hitDrop+1); setHit(); };
+$("hit-cancel").onclick = ()=>$("dlg-hit").close();
+$("hit-ok").onclick = ()=>{
+  const x = q(); snap();
+  addRun(x);
+  const kin = x.kinki && hitWin;
+  x.hist.push({n:x.hamari+1, t:Date.now(), w:hitWin, d:hitWin ? hitDrop : 0, b:x.boost,
+               s: kin && $("hit-shiho").checked, l: kin && $("hit-lucky").checked});
+  x.hamari = 0;
+  save(); $("dlg-hit").close(); buzz([30,40,30]); render(true);
+  const i = x.hist.length-1;
+  toast(`${x.hist[i].n}周目で遭遇を記録しました`, true, ()=>openShare(i));
+};
+
+/* EXの情報 */
+$("cond").onclick = ()=>{
+  const x = q(), i = x.info; if(!i) return;
+  $("info-title").textContent = x.name;
+  const pr = v => v ? v + "%" : "不明";
+  const rows = [
+    ["出るクエスト", i.from],
+    ["確率アップ条件", `<span class="trust ${i.trust}">${TRUST[i.trust]}</span> ${esc(i.cond)}`, true],
+    ["確率の目安", `ふだん ${pr(x.prob.n)}／条件あり ${pr(x.prob.b)}`],
+    ["補足", i.note],
+    ["出典", i.src],
+    ["調べた日", i.date]
+  ].filter(r=>r[1]);
+  $("info-body").innerHTML = rows.map(([k,v,raw])=>`<tr><th>${k}</th><td>${raw ? v : esc(v)}</td></tr>`).join("");
+  openSheet($("dlg-info"));
+};
+
+/* クエスト切替 */
+function renderQuests(){
+  $("qlist").innerHTML = state.quests.map((x,i)=>{
+    const c = calc(x);
+    return `<button class="qitem" data-q="${i}" aria-current="${i===state.current}">
+      <span class="qn">${esc(x.name)}</span><span class="qs num">ハマり${x.hamari}　ラック${c.luck}/${x.goal}</span></button>`;
+  }).join("");
+  $("qlist").querySelectorAll("[data-q]").forEach(b=>b.onclick = ()=>{
+    state.current = +b.dataset.q; save(); render(); $("dlg-quests").close();
+  });
+}
+function renderPresets(){
+  $("preset-date").textContent = PRESET_DATE;
+  $("plist").innerHTML = PRESETS.map((g,gi)=>`<details class="pgroup"><summary>${esc(g.group)}（${g.items.length}）</summary><div class="plist">` +
+    g.items.map((it,ii)=>`<button class="pitem" data-p="${gi}-${ii}"><span class="pn">${esc(it.name)}</span>
+      <span class="trust ${it.trust}">${TRUST[it.trust]}</span><span class="pc">${esc(it.cond)}</span></button>`).join("") + `</div></details>`).join("");
+  $("plist").querySelectorAll("[data-p]").forEach(b=>b.onclick = ()=>{
+    const [gi,ii] = b.dataset.p.split("-").map(Number);
+    addQuestObj(questFromPreset({...PRESETS[gi].items[ii], kinki:!!PRESETS[gi].kinki}));
+  });
+}
+function addQuestObj(nq){
+  const same = state.quests.findIndex(x=>x.name === nq.name);
+  if(same >= 0){ state.current = same; save(); render(); $("dlg-quests").close(); toast(`「${nq.name}」はもうあるので切り替えました`); return; }
+  state.quests.push(nq); state.current = state.quests.length-1;
+  save(); render(); $("dlg-quests").close(); toast(`「${nq.name}」を追加しました`);
+}
+$("quest-btn").onclick = ()=>{ renderQuests(); renderPresets(); $("new-q").value = ""; openSheet($("dlg-quests")); };
+function addQuest(){
+  const name = $("new-q").value.trim(); if(!name) return;
+  const pr = findPreset(name);   // 一覧にある名前なら条件も入れる
+  addQuestObj(pr ? questFromPreset(pr) : normQuest({name}));
+}
+$("new-q-add").onclick = addQuest;
+$("new-q").onkeydown = e=>{ if(e.key==="Enter") addQuest(); };
+
+/* 設定 */
+let draftExtras = [];
+function renderXlist(){
+  $("xlist").innerHTML = draftExtras.map((e,i)=>`<div class="xitem"><span>${esc(e.name)}</span>
+    <button class="row-btn" data-xd="${i}" aria-label="${esc(e.name)}を消す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`).join("");
+  $("xlist").querySelectorAll("[data-xd]").forEach(b=>b.onclick = ()=>{ draftExtras.splice(+b.dataset.xd,1); renderXlist(); });
+}
+function openSettings(){
+  const x = q();
+  $("set-name").value = x.name;
+  $("set-pn").value = x.prob.n ?? ""; $("set-pb").value = x.prob.b ?? "";
+  $("set-l0").value = x.luck0; $("set-goal").value = x.goal;
+  $("set-ham").value = x.hamari; $("set-runs").value = `${x.runs.n} / ${x.runs.b}`;
+  $("set-kinki").checked = x.kinki;
+  $("set-cond").value = x.info ? x.info.cond : "";
+  draftExtras = x.extras.map(e=>({...e})); renderXlist(); $("new-x").value = "";
+  openSheet($("dlg-set"));
+}
+$("gear").onclick = openSettings;
+function addExtra(){
+  const name = $("new-x").value.trim(); if(!name) return;
+  draftExtras.push({name, c:0}); $("new-x").value = ""; renderXlist();
+}
+$("new-x-add").onclick = addExtra;
+$("new-x").onkeydown = e=>{ if(e.key==="Enter") addExtra(); };
+const toNum = v => { const s = String(v).replace(/[０-９．]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).trim(); return s === "" ? "" : +s; };
+$("set-save").onclick = ()=>{
+  const x = q(); snap();
+  const runs = String($("set-runs").value).replace(/[０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).split(/[\/／,、\s]+/).filter(Boolean).map(Number);
+  const merged = normQuest({
+    ...x,
+    name: $("set-name").value.trim() || x.name,
+    prob: {n: toNum($("set-pn").value), b: toNum($("set-pb").value)},
+    luck0: toNum($("set-l0").value), goal: toNum($("set-goal").value) || 99,
+    hamari: toNum($("set-ham").value),
+    runs: {n: runs[0] ?? x.runs.n, b: runs[1] ?? 0},
+    kinki: $("set-kinki").checked,
+    extras: draftExtras,
+    info: (()=>{
+      const t = $("set-cond").value.trim();
+      if(!t) return null;
+      if(x.info && x.info.cond === t) return x.info;   // 書き換えていなければそのまま
+      const o = x.info;
+      return {from: o ? o.from : "", cond:t, trust:"memo",
+        note: o && o.trust !== "memo" ? `元の情報：［${TRUST[o.trust]}］${o.cond}` : (o ? o.note : ""),
+        src: o && o.trust !== "memo" ? `自分で書き直し（元の出典：${o.src}）` : (o && o.src ? o.src : "自分で書き直し"),
+        date: new Date().toLocaleDateString("ja-JP")};
+    })()
+  });
+  state.quests[state.current] = merged;
+  save(); render(); $("dlg-set").close(); toast("保存しました", true);
+};
+$("set-reset").onclick = ()=>{
+  const x = q();
+  if(!confirm(`「${x.name}」の周回数と履歴を0に戻しますか？（確率の目安などの設定は残ります）`)) return;
+  snap();
+  state.quests[state.current] = normQuest({name:x.name, prob:x.prob, goal:x.goal, kinki:x.kinki, info:x.info, extras:x.extras.map(e=>({name:e.name,c:0}))});
+  save(); render(); $("dlg-set").close(); toast("0に戻しました", true);
+};
+$("set-del").onclick = ()=>{
+  const x = q();
+  if(!confirm(`「${x.name}」を削除しますか？記録も消えます。`)) return;
+  snap();
+  state.quests.splice(state.current,1);
+  if(!state.quests.length) state.quests.push(normQuest({}));
+  state.current = 0; save(); render(); $("dlg-set").close(); toast(`「${x.name}」を削除しました`, true);
+};
+
+/* 投稿文 */
+let shareText = "";
+function buildShare(x, i){
+  const c = calc(x), h = x.hist[i];
+  const res = h.w===true ? (h.d > 1 ? `勝利（${h.d}体）` : "勝利") : h.w===false ? "敗北…" : "";
+  const extra = [h.b ? "確率アップ条件あり" : "", h.s ? "至宝発動" : "", h.l ? "ラッキーリザルト" : ""].filter(Boolean).join("・");
+  return [
+    `【${x.name}】${h.n}周目でEX遭遇！${res ? " " + res : ""}`,
+    extra ? `（${extra}）` : null,
+    `遭遇率 ${pct(c.rate)}（${c.enc}回 / ${c.total}周）`,
+    `ラック ${c.luck} / ${x.goal}${c.luck >= x.goal ? " 運極達成！" : ""}`,
+    `#モンスト #EXカウンター`
+  ].filter(v=>v!==null).join("\n");
+}
+function openShare(i){
+  shareText = buildShare(q(), i);
+  $("share-text").textContent = shareText;
+  hideToast(); openSheet($("dlg-share"));
+}
+$("share-x").onclick = ()=>{ location.href = "https://x.com/intent/post?text=" + encodeURIComponent(shareText); };
+$("share-copy").onclick = async ()=>{
+  try{ await navigator.clipboard.writeText(shareText); toast("コピーしました"); }
+  catch(e){ toast("うまくコピーできませんでした。文を長押ししてコピーしてください"); }
+};
+
+/* お知らせ（取り消しボタンつき） */
+let toastTimer;
+function hideToast(){ $("toast").classList.remove("show"); }
+function toast(msg, canUndo, onShare){
+  const t = $("toast");
+  t.innerHTML = `<span class="tm">${esc(msg)}</span>`;
+  if(onShare){ const b = document.createElement("button"); b.className = "tx"; b.textContent = "投稿文"; b.onclick = onShare; t.appendChild(b); }
+  if(canUndo){ const b = document.createElement("button"); b.textContent = "取り消す"; b.onclick = ()=>{ hideToast(); undo(); }; t.appendChild(b); }
+  t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, canUndo ? 6000 : 2200);
+}
+
+/* バックアップ */
+$("export").onclick = async ()=>{
+  const text = JSON.stringify(state);
+  $("bk").value = text;
+  try{ await navigator.clipboard.writeText(text); toast("コピーしました。メモアプリなどに貼って保存してください"); }
+  catch(e){ $("bk").select(); toast("欄の文字を長押ししてコピーしてください"); }
+};
+$("import").onclick = ()=>{
+  let data = null;
+  try{ data = normState(JSON.parse($("bk").value)); }catch(e){}
+  if(!data){ toast("読み込めませんでした。書き出した文字をそのまま貼ってください"); return; }
+  if(!confirm("今の記録を、貼り付けたデータで置き換えますか？")) return;
+  snap(); state = data; save(); render(); toast("読み込みました", true);
+};
+
+load(); save(); render();
+try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+</script>
+</body>
+</html>
