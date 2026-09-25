@@ -99,6 +99,11 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 .pitem{display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:10px 12px; border-radius:12px; background:var(--panel-2)}
 .pitem .pn{font-weight:800; flex:none}
 .pitem .pc{flex:1; min-width:0; font-size:.72rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.icon-row{display:flex; align-items:center; gap:14px; margin-top:8px}
+.icon-prev{width:64px; height:64px; border-radius:50%; flex:none; display:grid; place-items:center;
+  color:#fff; font-weight:800; font-size:1.3rem; background-size:cover; background-position:center}
+.icon-btns{flex:1}
+.chip.img{color:transparent; background-size:cover; background-position:center}
 .info-table{width:100%; border-collapse:collapse; font-size:.85rem}
 .info-table th{text-align:left; color:var(--muted); font-weight:700; padding:9px 10px 9px 0; vertical-align:top; white-space:nowrap; width:6.5em}
 .info-table td{padding:9px 0; line-height:1.6}
@@ -332,6 +337,17 @@ dialog::backdrop{background:rgba(5,10,20,.55)}
   </div>
   <p class="hint">入れると「今のハマりはどのくらい不運か」が出ます。攻略サイトの目安（多くは0.5〜4％）を入れてください。空欄なら表示しません。</p>
 
+  <div class="sec">アイコンの画像</div>
+  <div class="icon-row">
+    <span class="icon-prev" id="icon-prev"></span>
+    <div class="icon-btns">
+      <button class="ghost" id="icon-pick" style="margin-top:0">写真を選ぶ</button>
+      <button class="ghost" id="icon-clear" style="margin-top:6px">画像を消す</button>
+    </div>
+  </div>
+  <input type="file" id="icon-file" accept="image/*" hidden>
+  <p class="hint">選んだ画像は<b>このiPhoneの中だけ</b>に保存されます（ネットには上がりません）。正方形に切って小さく縮めます。※バックアップの文字には画像は入りません。</p>
+
   <div class="sec">確率アップ条件のメモ</div>
   <label class="field"><textarea class="memo" id="set-cond" maxlength="200" placeholder="例：HP満タンでクリア"></textarea></label>
   <p class="hint">新しい情報が出たら書き直せます。書き直すと印が「自分のメモ」に変わります。</p>
@@ -448,7 +464,31 @@ function questFromPreset(pr){
    ・旧版 "ex-counter-v1" は消さずに残す（最初の1回だけ写して使う）
    ・項目を足すときは normQuest() に既定値を1行足すだけでよい
    ============================================================ */
-const KEY = "ex-counter-v2", OLD_KEY = "ex-counter-v1";
+const KEY = "ex-counter-v2", OLD_KEY = "ex-counter-v1", ICON_KEY = "ex-counter-icons";
+/* アイコン画像：{クエストid: データURL}。この端末の中だけに保存し、ネットには送らない。
+   写真は正方形に切って128pxに縮めてから保存する（1枚およそ5〜10KB） */
+let icons = {};
+function loadIcons(){ try{ icons = JSON.parse(localStorage.getItem(ICON_KEY)) || {}; }catch(e){ icons = {}; } }
+function saveIcons(){ try{ localStorage.setItem(ICON_KEY, JSON.stringify(icons)); return true; }catch(e){ return false; } }
+function shrinkImage(file){
+  return new Promise((ok, ng)=>{
+    const fr = new FileReader();
+    fr.onerror = ()=>ng(new Error("読み込めません"));
+    fr.onload = ()=>{
+      const im = new Image();
+      im.onerror = ()=>ng(new Error("画像として開けません"));
+      im.onload = ()=>{
+        const S = 128, side = Math.min(im.width, im.height);
+        const cv = document.createElement("canvas"); cv.width = cv.height = S;
+        const g = cv.getContext("2d");
+        g.drawImage(im, (im.width-side)/2, (im.height-side)/2, side, side, 0, 0, S, S);
+        ok(cv.toDataURL("image/jpeg", 0.82));
+      };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
 let state;
 
 function normQuest(q){
@@ -456,6 +496,7 @@ function normQuest(q){
   const n = v => Number.isFinite(+v) && +v >= 0 ? Math.floor(+v) : 0;
   const p = v => v === null || v === "" || v === undefined || !Number.isFinite(+v) || +v <= 0 || +v > 100 ? null : +v;
   return {
+    id: String(q.id || (Date.now().toString(36) + Math.random().toString(36).slice(2,8))),
     name: String(q.name || "周回クエスト").slice(0,30),
     hamari: n(q.hamari),
     runs: {n: n(q.runs && q.runs.n), b: n(q.runs && q.runs.b)},
@@ -560,8 +601,8 @@ function chipLabel(name){
 function renderTabs(){
   const t = $("tabs");
   t.innerHTML = state.quests.map((x,i)=>`
-    <button class="chip" role="tab" data-t="${i}" aria-selected="${i===state.current}"
-      style="background:${chipColor(x.name)}" aria-label="${esc(x.name)}（ハマり${x.hamari}周）" title="${esc(x.name)}">
+    <button class="chip${icons[x.id] ? " img" : ""}" role="tab" data-t="${i}" aria-selected="${i===state.current}"
+      style="background:${icons[x.id] ? `url('${icons[x.id]}')` : chipColor(x.name)}" aria-label="${esc(x.name)}（ハマり${x.hamari}周）" title="${esc(x.name)}">
       ${esc(chipLabel(x.name))}${x.hamari ? `<span class="badge num">${x.hamari}</span>` : ""}</button>`).join("");
   t.querySelectorAll("[data-t]").forEach(b=>b.onclick = ()=>{
     const i = +b.dataset.t;
@@ -813,9 +854,32 @@ function openSettings(){
   $("set-kinki").checked = x.kinki;
   $("set-cond").value = x.info ? x.info.cond : "";
   draftExtras = x.extras.map(e=>({...e})); renderXlist(); $("new-x").value = "";
+  renderIconPreview();
   openSheet($("dlg-set"));
 }
 $("gear").onclick = openSettings;
+function renderIconPreview(){
+  const x = q(), p = $("icon-prev"), img = icons[x.id];
+  p.style.background = img ? `url('${img}') center/cover` : chipColor(x.name);
+  p.textContent = img ? "" : chipLabel(x.name);
+  $("icon-clear").hidden = !img;
+  $("icon-pick").textContent = img ? "写真を選び直す" : "写真を選ぶ";
+}
+$("icon-pick").onclick = ()=>$("icon-file").click();
+$("icon-file").onchange = async e=>{
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if(!f) return;
+  try{
+    const data = await shrinkImage(f);
+    icons[q().id] = data;
+    if(!saveIcons()){ delete icons[q().id]; toast("保存できませんでした（端末の空きが足りないようです）"); return; }
+    renderIconPreview(); render(); toast("画像を入れました");
+  }catch(err){ toast("この画像は読み込めませんでした"); }
+};
+$("icon-clear").onclick = ()=>{
+  delete icons[q().id]; saveIcons(); renderIconPreview(); render(); toast("画像を消しました");
+};
 function addExtra(){
   const name = $("new-x").value.trim(); if(!name) return;
   draftExtras.push({name, c:0}); $("new-x").value = ""; renderXlist();
@@ -860,6 +924,7 @@ $("set-del").onclick = ()=>{
   const x = q();
   if(!confirm(`「${x.name}」を削除しますか？記録も消えます。`)) return;
   snap();
+  delete icons[x.id]; saveIcons();
   state.quests.splice(state.current,1);
   if(!state.quests.length) state.quests.push(normQuest({}));
   state.current = 0; save(); render(); $("dlg-set").close(); toast(`「${x.name}」を削除しました`, true);
@@ -918,7 +983,7 @@ $("import").onclick = ()=>{
 };
 
 $("chip-add").onclick = () => openQuestList();
-load(); save(); render();
+load(); loadIcons(); save(); render();
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 if("serviceWorker" in navigator){
   window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
