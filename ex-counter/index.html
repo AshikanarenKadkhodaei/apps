@@ -103,7 +103,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 .icon-prev{width:64px; height:64px; border-radius:50%; flex:none; display:grid; place-items:center;
   color:#fff; font-weight:800; font-size:1.3rem; background-size:cover; background-position:center}
 .icon-btns{flex:1}
-.chip.img{color:transparent; background-size:cover; background-position:center}
+.chip.img{color:transparent}
 .info-table{width:100%; border-collapse:collapse; font-size:.85rem}
 .info-table th{text-align:left; color:var(--muted); font-weight:700; padding:9px 10px 9px 0; vertical-align:top; white-space:nowrap; width:6.5em}
 .info-table td{padding:9px 0; line-height:1.6}
@@ -346,7 +346,7 @@ dialog::backdrop{background:rgba(5,10,20,.55)}
     </div>
   </div>
   <input type="file" id="icon-file" accept="image/*" hidden>
-  <p class="hint">選んだ画像は<b>このiPhoneの中だけ</b>に保存されます（ネットには上がりません）。正方形に切って256pxに縮めます。※バックアップの文字には画像は入りません。</p>
+  <p class="hint">選んだ画像は<b>このiPhoneの中だけ</b>に保存されます（ネットには上がりません）。正方形に切って256pxに縮めます。背景を抜いた画像（透明）も、そのまま使えます。※バックアップの文字には画像は入りません。</p>
 
   <div class="sec">確率アップ条件のメモ</div>
   <label class="field"><textarea class="memo" id="set-cond" maxlength="200" placeholder="例：HP満タンでクリア"></textarea></label>
@@ -482,7 +482,17 @@ function shrinkImage(file){
         const cv = document.createElement("canvas"); cv.width = cv.height = S;
         const g = cv.getContext("2d");
         g.drawImage(im, (im.width-side)/2, (im.height-side)/2, side, side, 0, 0, S, S);
-        ok(cv.toDataURL("image/jpeg", 0.92));
+        // 透明な部分があるならPNG（背景を抜いた画像）、無ければJPEG（容量が軽い）
+        let hasAlpha = false;
+        try{
+          const d = g.getImageData(0,0,S,S).data;
+          for(let i=3;i<d.length;i+=4){ if(d[i] < 250){ hasAlpha = true; break; } }
+        }catch(e){}
+        if(!hasAlpha){ ok(cv.toDataURL("image/jpeg", 0.92)); return; }
+        // 透明ありはPNG（容量が大きいので192pxに）
+        const P = 192, cv2 = document.createElement("canvas"); cv2.width = cv2.height = P;
+        cv2.getContext("2d").drawImage(cv, 0, 0, P, P);
+        ok(cv2.toDataURL("image/png"));
       };
       im.src = fr.result;
     };
@@ -602,7 +612,7 @@ function renderTabs(){
   const t = $("tabs");
   t.innerHTML = state.quests.map((x,i)=>`
     <button class="chip${icons[x.id] ? " img" : ""}" role="tab" data-t="${i}" aria-selected="${i===state.current}"
-      style="background:${icons[x.id] ? `url('${icons[x.id]}')` : chipColor(x.name)}" aria-label="${esc(x.name)}（ハマり${x.hamari}周）" title="${esc(x.name)}">
+      style="background:${icons[x.id] ? `url('${icons[x.id]}') center/cover, ${chipColor(x.name)}` : chipColor(x.name)}" aria-label="${esc(x.name)}（ハマり${x.hamari}周）" title="${esc(x.name)}">
       ${esc(chipLabel(x.name))}${x.hamari ? `<span class="badge num">${x.hamari}</span>` : ""}</button>`).join("");
   t.querySelectorAll("[data-t]").forEach(b=>b.onclick = ()=>{
     const i = +b.dataset.t;
@@ -860,7 +870,7 @@ function openSettings(){
 $("gear").onclick = openSettings;
 function renderIconPreview(){
   const x = q(), p = $("icon-prev"), img = icons[x.id];
-  p.style.background = img ? `url('${img}') center/cover` : chipColor(x.name);
+  p.style.background = img ? `url('${img}') center/cover, ${chipColor(x.name)}` : chipColor(x.name);
   p.textContent = img ? "" : chipLabel(x.name);
   $("icon-clear").hidden = !img;
   $("icon-pick").textContent = img ? "写真を選び直す" : "写真を選ぶ";
