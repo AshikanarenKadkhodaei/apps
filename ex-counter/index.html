@@ -50,21 +50,24 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 
 /* ヘッダー */
 .top{display:flex; gap:8px; align-items:center}
-.quest-btn{
-  flex:1; min-width:0; display:flex; align-items:center; gap:8px; text-align:left;
-  background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:11px 14px; box-shadow:var(--shadow);
-}
-.quest-btn .qn{flex:1; min-width:0; font-weight:800; font-size:1.05rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.quest-btn .caret{color:var(--muted); font-size:.8rem}
+.tabs{flex:1; min-width:0; display:flex; gap:8px; overflow-x:auto; padding:2px 2px 4px; scrollbar-width:none; -webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.chip{position:relative; flex:none; width:52px; height:52px; border-radius:50%; display:grid; place-items:center;
+  font-weight:800; font-size:1.05rem; color:#fff; border:3px solid transparent; box-shadow:var(--shadow)}
+.chip[aria-selected="true"]{border-color:var(--gold)}
+.chip .badge{position:absolute; right:-2px; bottom:-2px; min-width:20px; height:20px; padding:0 4px; border-radius:999px;
+  background:var(--panel); color:var(--ink); border:1px solid var(--line); font-size:.62rem; font-weight:800; display:grid; place-items:center}
+.chip.add{background:var(--panel); color:var(--muted); border:2px dashed var(--line); font-size:1.4rem; font-weight:500; width:44px; height:44px; box-shadow:none}
+.qtitle{font-weight:800; font-size:1.15rem; margin-bottom:2px}
 .gear{
-  width:48px; height:48px; flex:none; display:grid; place-items:center;
+  width:44px; height:44px; flex:none; display:grid; place-items:center;
   background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
 }
 .gear svg{width:22px; height:22px}
 
 /* カウンター */
 .counter{margin-top:14px; text-align:center; padding:18px 12px 16px; background:var(--panel); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow)}
-.count-label{color:var(--muted); font-size:.85rem; letter-spacing:.08em}
+.count-label{color:var(--muted); font-size:.8rem; letter-spacing:.08em}
 .count{font-size:clamp(5rem,28vw,8rem); font-weight:800; line-height:1.02; letter-spacing:-.02em}
 .count small{font-size:.22em; font-weight:700; color:var(--muted); margin-left:.15em; letter-spacing:0}
 .meta{color:var(--muted); font-size:.8rem; margin-top:4px}
@@ -239,15 +242,15 @@ dialog::backdrop{background:rgba(5,10,20,.55)}
 <body>
 <main>
   <div class="top">
-    <button class="quest-btn" id="quest-btn" aria-label="クエストを切り替える">
-      <span class="qn" id="qname"></span><span class="caret">▼ 切替</span>
-    </button>
+    <div class="tabs" id="tabs" role="tablist" aria-label="クエストの切り替え"></div>
+    <button class="chip add" id="chip-add" aria-label="クエストを追加・一覧を開く">＋</button>
     <button class="gear" id="gear" aria-label="このクエストの設定">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
   </div>
 
   <section class="counter" aria-live="polite">
+    <div class="qtitle" id="qtitle"></div>
     <div class="count-label">ハマり（前回のEXから）</div>
     <div class="count num" id="count">0<small>周</small></div>
     <div class="meta" id="meta"></div>
@@ -545,9 +548,34 @@ function fmt(t){
    ============================================================ */
 const $ = id => document.getElementById(id);
 
+const CHIP_COLORS = ["#2C66B5","#7A4FD6","#C0423A","#1E8A5A","#C2851B","#0F7C8C","#B8457E","#4A5B8C"];
+function chipColor(name){
+  let h = 0; for(const ch of name) h = (h*31 + ch.codePointAt(0)) % 100000;
+  return CHIP_COLORS[h % CHIP_COLORS.length];
+}
+function chipLabel(name){
+  const n = name.replace(/[【】\[\]（）()\s]/g, "");
+  return n.slice(0, /^[A-Za-z0-9]/.test(n) ? 2 : 1) || "？";
+}
+function renderTabs(){
+  const t = $("tabs");
+  t.innerHTML = state.quests.map((x,i)=>`
+    <button class="chip" role="tab" data-t="${i}" aria-selected="${i===state.current}"
+      style="background:${chipColor(x.name)}" aria-label="${esc(x.name)}（ハマり${x.hamari}周）" title="${esc(x.name)}">
+      ${esc(chipLabel(x.name))}${x.hamari ? `<span class="badge num">${x.hamari}</span>` : ""}</button>`).join("");
+  t.querySelectorAll("[data-t]").forEach(b=>b.onclick = ()=>{
+    const i = +b.dataset.t;
+    if(i === state.current){ openQuestList(); return; }   // 今のをもう一度押すと一覧
+    state.current = i; save(); render();
+  });
+  const cur = t.querySelector('[aria-selected="true"]');
+  if(cur) cur.scrollIntoView({block:"nearest", inline:"nearest"});
+}
+
 function render(bump){
   const x = q(), c = calc(x);
-  $("qname").textContent = x.name;
+  $("qtitle").textContent = x.name;
+  renderTabs();
   const cnt = $("count");
   cnt.innerHTML = `${x.hamari}<small>周</small>`;
   if(bump){ cnt.classList.remove("bump"); void cnt.offsetWidth; cnt.classList.add("bump"); }
@@ -760,7 +788,7 @@ function addQuestObj(nq){
   state.quests.push(nq); state.current = state.quests.length-1;
   save(); render(); $("dlg-quests").close(); toast(`「${nq.name}」を追加しました`);
 }
-$("quest-btn").onclick = ()=>{ renderQuests(); renderPresets(); $("new-q").value = ""; openSheet($("dlg-quests")); };
+function openQuestList(){ renderQuests(); renderPresets(); $("new-q").value = ""; openSheet($("dlg-quests")); }
 function addQuest(){
   const name = $("new-q").value.trim(); if(!name) return;
   const pr = findPreset(name);   // 一覧にある名前なら条件も入れる
@@ -889,6 +917,7 @@ $("import").onclick = ()=>{
   snap(); state = data; save(); render(); toast("読み込みました", true);
 };
 
+$("chip-add").onclick = () => openQuestList();
 load(); save(); render();
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 if("serviceWorker" in navigator){
