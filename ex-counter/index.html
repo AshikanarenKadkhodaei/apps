@@ -346,7 +346,7 @@ dialog::backdrop{background:rgba(5,10,20,.55)}
     </div>
   </div>
   <input type="file" id="icon-file" accept="image/*" hidden>
-  <p class="hint">選んだ画像は<b>このiPhoneの中だけ</b>に保存されます（ネットには上がりません）。正方形に切って小さく縮めます。※バックアップの文字には画像は入りません。</p>
+  <p class="hint">選んだ画像は<b>このiPhoneの中だけ</b>に保存されます（ネットには上がりません）。正方形に切って256pxに縮めます。※バックアップの文字には画像は入りません。</p>
 
   <div class="sec">確率アップ条件のメモ</div>
   <label class="field"><textarea class="memo" id="set-cond" maxlength="200" placeholder="例：HP満タンでクリア"></textarea></label>
@@ -466,7 +466,7 @@ function questFromPreset(pr){
    ============================================================ */
 const KEY = "ex-counter-v2", OLD_KEY = "ex-counter-v1", ICON_KEY = "ex-counter-icons";
 /* アイコン画像：{クエストid: データURL}。この端末の中だけに保存し、ネットには送らない。
-   写真は正方形に切って128pxに縮めてから保存する（1枚およそ5〜10KB） */
+   写真は正方形に切って256pxに縮めてから保存する（1枚およそ15〜35KB） */
 let icons = {};
 function loadIcons(){ try{ icons = JSON.parse(localStorage.getItem(ICON_KEY)) || {}; }catch(e){ icons = {}; } }
 function saveIcons(){ try{ localStorage.setItem(ICON_KEY, JSON.stringify(icons)); return true; }catch(e){ return false; } }
@@ -478,11 +478,11 @@ function shrinkImage(file){
       const im = new Image();
       im.onerror = ()=>ng(new Error("画像として開けません"));
       im.onload = ()=>{
-        const S = 128, side = Math.min(im.width, im.height);
+        const S = 256, side = Math.min(im.width, im.height);
         const cv = document.createElement("canvas"); cv.width = cv.height = S;
         const g = cv.getContext("2d");
         g.drawImage(im, (im.width-side)/2, (im.height-side)/2, side, side, 0, 0, S, S);
-        ok(cv.toDataURL("image/jpeg", 0.82));
+        ok(cv.toDataURL("image/jpeg", 0.92));
       };
       im.src = fr.result;
     };
