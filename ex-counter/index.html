@@ -103,7 +103,8 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 .icon-prev{width:64px; height:64px; border-radius:50%; flex:none; display:grid; place-items:center;
   color:#fff; font-weight:800; font-size:1.3rem; background-size:cover; background-position:center}
 .icon-btns{flex:1}
-.chip.img{color:transparent}
+.chip.img{color:transparent; border-color:var(--line)}
+.chip.img[aria-selected="true"]{border-color:var(--gold)}
 .info-table{width:100%; border-collapse:collapse; font-size:.85rem}
 .info-table th{text-align:left; color:var(--muted); font-weight:700; padding:9px 10px 9px 0; vertical-align:top; white-space:nowrap; width:6.5em}
 .info-table td{padding:9px 0; line-height:1.6}
@@ -612,7 +613,7 @@ function renderTabs(){
   const t = $("tabs");
   t.innerHTML = state.quests.map((x,i)=>`
     <button class="chip${icons[x.id] ? " img" : ""}" role="tab" data-t="${i}" aria-selected="${i===state.current}"
-      style="background:${icons[x.id] ? `url('${icons[x.id]}') center/cover, ${chipColor(x.name)}` : chipColor(x.name)}" aria-label="${esc(x.name)}（ハマり${x.hamari}周）" title="${esc(x.name)}">
+      style="background:${icons[x.id] ? `url('${icons[x.id]}') center/contain no-repeat, var(--panel-2)` : chipColor(x.name)}" aria-label="${esc(x.name)}（ハマり${x.hamari}周）" title="${esc(x.name)}">
       ${esc(chipLabel(x.name))}${x.hamari ? `<span class="badge num">${x.hamari}</span>` : ""}</button>`).join("");
   t.querySelectorAll("[data-t]").forEach(b=>b.onclick = ()=>{
     const i = +b.dataset.t;
@@ -870,7 +871,7 @@ function openSettings(){
 $("gear").onclick = openSettings;
 function renderIconPreview(){
   const x = q(), p = $("icon-prev"), img = icons[x.id];
-  p.style.background = img ? `url('${img}') center/cover, ${chipColor(x.name)}` : chipColor(x.name);
+  p.style.background = img ? `url('${img}') center/contain no-repeat, var(--panel-2)` : chipColor(x.name);
   p.textContent = img ? "" : chipLabel(x.name);
   $("icon-clear").hidden = !img;
   $("icon-pick").textContent = img ? "写真を選び直す" : "写真を選ぶ";
