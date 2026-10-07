@@ -375,6 +375,9 @@ dialog::backdrop{background:rgba(5,10,20,.55)}
   <div class="xlist" id="xlist"></div>
   <div class="add-row"><input id="new-x" placeholder="例：2体ドロップ／SS事故" maxlength="20" enterkeyhint="done"><button id="new-x-add">追加</button></div>
 
+  <button class="ghost" id="set-refresh" style="margin-top:14px">EXの一覧から情報を入れ直す</button>
+  <p class="hint">確率の目安と条件を、最新の一覧の内容で上書きします（名前が一覧にあるときだけ）。自分で書いたメモも置き換わります。</p>
+
   <button class="primary" id="set-save">保存する</button>
   <button class="ghost" data-close>やめる</button>
   <button class="danger-link" id="set-reset">このクエストの記録を0に戻す</button>
@@ -415,9 +418,9 @@ const G8 = "ゲームエイト「EXステージの出現条件と攻略」（202
 const PRESETS = [
   {group:"破界の星墓", items:[
     {name:"インゼムニア", from:"メラン&コリンの星墓（破界の星墓を全ステージクリア後）", cond:"まだ判明していない", trust:"unknown", pn:null, pb:null, src:G8},
-    {name:"アムネディア", from:"パラノヴィアの星墓（破界の星墓を全ステージクリア後）", cond:"パーティの総ラック100以上（運枠を編成するのでもよい）", trust:"verified", pn:0.2, pb:4,
-      note:"「編成パーティの総合ラックに応じて出現確率アップ」。条件ありで100周して約4回＝約4％（攻略班の検証）。★ラック100未満は段階的に下がり、総ラック20で約0.2％・総ラック100で2〜4％という報告がある（個人の検証なので目安）",
-      src:G8+"／Yahoo!知恵袋（個人の検証）"},
+    {name:"アムネディア", from:"パラノヴィアの星墓（破界の星墓を全ステージクリア後）", cond:"パーティの総ラック100以上（運枠を編成するのでもよい）", trust:"verified", pn:0.5, pb:4,
+      note:"大前提＝破界の星墓を制覇（★が付くまでは出現率0％）。条件ありは攻略班が100周して約4回＝約4％、個人ブログでも総ラック102で65周3回（約4.6％）。★条件なしの0.5％は目安（同じ個人ブログが低ラックで約100周0回、知恵袋では総ラック20で約0.2％・100で2〜4％。ラックに応じて段階的に上がるとみられる）",
+      src:G8+"／個人ブログ『ストレスなくモンストをするためのメモ』（2026年6月8日）／Yahoo!知恵袋"},
   ]},
   {group:"天魔の孤城・空中庭園", items:[
     {name:"コルティーナ", from:"空中庭園【10】", cond:"空中庭園を無敗で制覇（1敗ごとに確率が下がると予想）", trust:"verified", pn:0.5, pb:1.5,
@@ -553,6 +556,17 @@ function normState(s){
   const out = {v:2, quests: s.quests.map(normQuest), current: +s.current || 0};
   if(!(out.current >= 0 && out.current < out.quests.length)) out.current = 0;
   return out;
+}
+function fillFromPresets(){
+  // 確率も条件も空のクエストは、一覧に同じ名前があればその情報を入れる
+  let changed = false;
+  for(const x of state.quests){
+    if(x.prob.n || x.prob.b || x.info) continue;
+    const pr = findPreset(x.name); if(!pr) continue;
+    const nq = questFromPreset(pr);
+    x.prob = nq.prob; x.info = nq.info; x.kinki = x.kinki || nq.kinki; changed = true;
+  }
+  return changed;
 }
 function load(){
   let s = null;
@@ -936,6 +950,15 @@ $("set-save").onclick = ()=>{
   state.quests[state.current] = merged;
   save(); render(); $("dlg-set").close(); toast("保存しました", true);
 };
+$("set-refresh").onclick = ()=>{
+  const x = q(), pr = findPreset(x.name);
+  if(!pr){ toast(`「${x.name}」はEXの一覧にありません`); return; }
+  if(!confirm(`「${x.name}」の確率の目安と条件を、一覧の内容で入れ直しますか？`)) return;
+  snap();
+  const nq = questFromPreset(pr);
+  x.prob = nq.prob; x.info = nq.info; x.kinki = nq.kinki;
+  save(); render(); $("dlg-set").close(); toast("一覧の情報を入れ直しました", true);
+};
 $("set-reset").onclick = ()=>{
   const x = q();
   if(!confirm(`「${x.name}」の周回数と履歴を0に戻しますか？（確率の目安などの設定は残ります）`)) return;
@@ -1007,7 +1030,7 @@ $("import").onclick = ()=>{
 };
 
 $("chip-add").onclick = () => openQuestList();
-load(); loadIcons(); save(); render();
+load(); loadIcons(); fillFromPresets(); save(); render();
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 if("serviceWorker" in navigator){
   window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
