@@ -125,6 +125,8 @@ textarea.memo{min-height:64px; font-size:16px; background:var(--panel-2)}
 .minus:disabled{opacity:.4; cursor:default}
 
 /* カード */
+.lose-btn{width:100%; margin-top:10px; padding:12px 0; border-radius:14px; background:var(--panel); border:1px solid var(--line); color:var(--muted); font-size:.9rem; font-weight:700}
+.lose-btn .num{color:var(--lose); font-weight:800}
 .card{margin-top:14px; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:14px 16px; box-shadow:var(--shadow)}
 .card-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
 .card-title{font-size:.8rem; color:var(--muted); font-weight:700; letter-spacing:.06em}
@@ -269,6 +271,7 @@ dialog::backdrop{background:rgba(5,10,20,.55)}
     <button class="minus" id="minus">−1</button>
     <button class="hit" id="hit">EX出た！</button>
   </div>
+  <button class="lose-btn" id="lose">周回で負けた <span class="num" id="lose-n"></span></button>
 
   <div class="card" id="luck-card"></div>
   <div class="card" id="luckmeter"></div>
@@ -362,6 +365,7 @@ dialog::backdrop{background:rgba(5,10,20,.55)}
   <div class="sec">周回数を手で直す</div>
   <div class="two">
     <label class="field"><span>いまのハマり</span><input id="set-ham" inputmode="numeric"></label>
+    <label class="field"><span>いまの周回負け</span><input id="set-lost" inputmode="numeric"></label>
     <label class="field"><span>総周回（条件なし／あり）</span><input id="set-runs" inputmode="numeric" placeholder="120 / 30"></label>
   </div>
 
@@ -411,8 +415,9 @@ const G8 = "ゲームエイト「EXステージの出現条件と攻略」（202
 const PRESETS = [
   {group:"破界の星墓", items:[
     {name:"インゼムニア", from:"メラン&コリンの星墓（破界の星墓を全ステージクリア後）", cond:"まだ判明していない", trust:"unknown", pn:null, pb:null, src:G8},
-    {name:"アムネディア", from:"パラノヴィアの星墓（破界の星墓を全ステージクリア後）", cond:"パーティの総ラック100以上（運枠を編成するのでもよい）", trust:"verified", pn:null, pb:4,
-      note:"「編成パーティの総合ラックに応じて出現確率アップ」。条件ありで100周して約4回＝約4％（攻略班の検証）", src:G8},
+    {name:"アムネディア", from:"パラノヴィアの星墓（破界の星墓を全ステージクリア後）", cond:"パーティの総ラック100以上（運枠を編成するのでもよい）", trust:"verified", pn:0.2, pb:4,
+      note:"「編成パーティの総合ラックに応じて出現確率アップ」。条件ありで100周して約4回＝約4％（攻略班の検証）。★ラック100未満は段階的に下がり、総ラック20で約0.2％・総ラック100で2〜4％という報告がある（個人の検証なので目安）",
+      src:G8+"／Yahoo!知恵袋（個人の検証）"},
   ]},
   {group:"天魔の孤城・空中庭園", items:[
     {name:"コルティーナ", from:"空中庭園【10】", cond:"空中庭園を無敗で制覇（1敗ごとに確率が下がると予想）", trust:"verified", pn:0.5, pb:1.5,
@@ -510,6 +515,7 @@ function normQuest(q){
     id: String(q.id || (Date.now().toString(36) + Math.random().toString(36).slice(2,8))),
     name: String(q.name || "周回クエスト").slice(0,30),
     hamari: n(q.hamari),
+    lost: n(q.lost),
     runs: {n: n(q.runs && q.runs.n), b: n(q.runs && q.runs.b)},
     boost: !!q.boost,
     prob: {n: p(q.prob && q.prob.n), b: p(q.prob && q.prob.b)},
@@ -518,7 +524,7 @@ function normQuest(q){
     kinki: !!q.kinki,
     extras: Array.isArray(q.extras) ? q.extras.filter(x=>x && x.name).map(x=>({name:String(x.name).slice(0,20), c:n(x.c)})) : [],
     hist: Array.isArray(q.hist) ? q.hist.filter(h=>h && Number.isFinite(+h.n)).map(h=>({
-      n: n(h.n), t: +h.t || Date.now(),
+      n: n(h.n), t: +h.t || Date.now(), lost: n(h.lost),
       w: h.w === true || h.w === false ? h.w : null,   // true=勝ち false=負け null=不明（旧版の記録）
       d: h.w === true ? Math.max(0, n(h.d === undefined ? 1 : h.d)) : 0,
       b: !!h.b, s: !!h.s, l: !!h.l
@@ -581,6 +587,7 @@ function calc(x){
     avg: ns.length ? ns.reduce((a,b)=>a+b,0)/ns.length : null,
     min: ns.length ? Math.min(...ns) : null,
     max: ns.length ? Math.max(...ns) : null,
+    lostAll: x.lost + x.hist.reduce((a,h)=>a+(h.lost||0),0),
     rateN: x.runs.n ? (enc-encB)/x.runs.n*100 : null, encN: enc-encB,
     rateB: x.runs.b ? encB/x.runs.b*100 : null, encB,
     shiho: wins.filter(h=>h.s).length, lucky: wins.filter(h=>h.l).length
@@ -631,7 +638,8 @@ function render(bump){
   const cnt = $("count");
   cnt.innerHTML = `${x.hamari}<small>周</small>`;
   if(bump){ cnt.classList.remove("bump"); void cnt.offsetWidth; cnt.classList.add("bump"); }
-  $("meta").textContent = `総周回 ${c.total}` + (x.last ? `　最終 ${fmt(x.last)}` : "");
+  $("meta").textContent = `総周回 ${c.total}` + (c.lostAll ? `　周回負け ${c.lostAll}（クリア率 ${(c.total/(c.total+c.lostAll)*100).toFixed(1)}%）` : "") + (x.last ? `　最終 ${fmt(x.last)}` : "");
+  $("lose-n").textContent = x.lost ? x.lost : "";
   $("minus").disabled = x.hamari === 0;
   $("boost").setAttribute("aria-pressed", x.boost);
   $("boost-label").textContent = "確率アップ条件：" + (x.boost ? "満たして周回中" : "なし");
@@ -723,7 +731,7 @@ function render(bump){
       <li><span class="n num">${h.n}<small>周目</small></span>
         <span class="mid"><span class="tags">
           ${h.w===true ? `<span class="tag w">勝ち${h.d!==1 ? "×"+h.d : ""}</span>` : h.w===false ? `<span class="tag l">負け</span>` : `<span class="tag u">勝敗不明</span>`}
-          ${h.b ? `<span class="tag b">条件あり</span>` : ""}${h.s ? `<span class="tag g">至宝</span>` : ""}${h.l ? `<span class="tag g">ラキリザ</span>` : ""}
+          ${h.lost ? `<span class="tag l">周回負け${h.lost}</span>` : ""}${h.b ? `<span class="tag b">条件あり</span>` : ""}${h.s ? `<span class="tag g">至宝</span>` : ""}${h.l ? `<span class="tag g">ラキリザ</span>` : ""}
         </span><span class="d num">${fmt(h.t)}</span></span>
         <button class="row-btn" data-share="${i}" aria-label="この記録の投稿文"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg></button>
         <button class="row-btn" data-del="${i}" aria-label="この記録を削除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -753,6 +761,10 @@ $("minus").onclick = ()=>{
   x.hamari--;
   if(x.boost && x.runs.b) x.runs.b--; else if(x.runs.n) x.runs.n--; else if(x.runs.b) x.runs.b--;
   save(); render(true);
+};
+$("lose").onclick = ()=>{
+  const x = q(); snap(); x.lost++; x.last = Date.now(); buzz(10); save(); render();
+  toast(`周回で負けた回数を ${x.lost} にしました`, true);
 };
 $("boost").onclick = ()=>{ const x = q(); x.boost = !x.boost; save(); render(); };
 
@@ -788,9 +800,9 @@ $("hit-ok").onclick = ()=>{
   const x = q(); snap();
   addRun(x);
   const kin = x.kinki && hitWin;
-  x.hist.push({n:x.hamari+1, t:Date.now(), w:hitWin, d:hitWin ? hitDrop : 0, b:x.boost,
+  x.hist.push({n:x.hamari+1, t:Date.now(), lost:x.lost, w:hitWin, d:hitWin ? hitDrop : 0, b:x.boost,
                s: kin && $("hit-shiho").checked, l: kin && $("hit-lucky").checked});
-  x.hamari = 0;
+  x.hamari = 0; x.lost = 0;
   save(); $("dlg-hit").close(); buzz([30,40,30]); render(true);
   const i = x.hist.length-1;
   toast(`${x.hist[i].n}周目で遭遇を記録しました`, true, ()=>openShare(i));
@@ -861,7 +873,7 @@ function openSettings(){
   $("set-name").value = x.name;
   $("set-pn").value = x.prob.n ?? ""; $("set-pb").value = x.prob.b ?? "";
   $("set-l0").value = x.luck0; $("set-goal").value = x.goal;
-  $("set-ham").value = x.hamari; $("set-runs").value = `${x.runs.n} / ${x.runs.b}`;
+  $("set-ham").value = x.hamari; $("set-lost").value = x.lost; $("set-runs").value = `${x.runs.n} / ${x.runs.b}`;
   $("set-kinki").checked = x.kinki;
   $("set-cond").value = x.info ? x.info.cond : "";
   draftExtras = x.extras.map(e=>({...e})); renderXlist(); $("new-x").value = "";
@@ -906,7 +918,7 @@ $("set-save").onclick = ()=>{
     name: $("set-name").value.trim() || x.name,
     prob: {n: toNum($("set-pn").value), b: toNum($("set-pb").value)},
     luck0: toNum($("set-l0").value), goal: toNum($("set-goal").value) || 99,
-    hamari: toNum($("set-ham").value),
+    hamari: toNum($("set-ham").value), lost: toNum($("set-lost").value),
     runs: {n: runs[0] ?? x.runs.n, b: runs[1] ?? 0},
     kinki: $("set-kinki").checked,
     extras: draftExtras,
@@ -951,6 +963,7 @@ function buildShare(x, i){
     `【${x.name}】${h.n}周目でEX遭遇！${res ? " " + res : ""}`,
     extra ? `（${extra}）` : null,
     `遭遇率 ${pct(c.rate)}（${c.enc}回 / ${c.total}周）`,
+    h.lost ? `この間の周回負け ${h.lost}回` : null,
     `ラック ${c.luck} / ${x.goal}${c.luck >= x.goal ? " 運極達成！" : ""}`,
     `#モンスト #EXカウンター`
   ].filter(v=>v!==null).join("\n");
