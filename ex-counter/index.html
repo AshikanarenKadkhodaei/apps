@@ -141,6 +141,11 @@ textarea.memo{min-height:64px; font-size:16px; background:var(--panel-2)}
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .link{color:#8DB7F2} }
 :root[data-theme="dark"] .link{color:#8DB7F2}
 
+.lmrow{margin-top:12px; padding-top:12px; border-top:1px dashed var(--line); opacity:.55}
+.lmrow:first-of-type{margin-top:8px; padding-top:0; border-top:0}
+.lmrow.on{opacity:1}
+.lmlab{font-size:.85rem; color:var(--muted)}
+.lmlab b{color:var(--ink); font-size:1rem}
 .luck-card.done{border-color:var(--gold)}
 .luck-card.done .big{color:var(--gold)}
 
@@ -678,29 +683,31 @@ function render(bump){
     <div class="bar luck"><i style="width:${Math.min(100, c.luck/x.goal*100)}%"></i></div>
     <div class="sub">${done ? "🎉 <b>運極達成！</b>" : `運極まで あと <b>${x.goal - c.luck}</b> 体${eta}`}</div>`;
 
-  // 運の良し悪し
+  // 運の良し悪し（条件なし・条件ありの両方を出す）
   const lm = $("luckmeter");
-  const p = x.boost && x.prob.b ? x.prob.b : x.prob.n;
-  if(!p && x.prob.b){
-    lm.innerHTML = `<div class="card-title">運の良し悪し</div>
-      <div class="sub">このEXは「確率アップ条件あり」の目安（${x.prob.b}%）だけ分かっています。条件を満たして回すときは、上のスイッチをオンにしてください。</div>`;
-  } else if(!p){
+  const nowP = x.boost && x.prob.b ? x.prob.b : x.prob.n;
+  const rows = [];
+  if(x.prob.n) rows.push({p:x.prob.n, label:"条件なし", on:!x.boost || !x.prob.b});
+  if(x.prob.b) rows.push({p:x.prob.b, label:"条件あり", on:!!x.boost});
+  if(!rows.length){
     lm.innerHTML = `<div class="card-title">運の良し悪し</div>
       <div class="sub">EXが出る確率の目安を入れると、今のハマりがどのくらい不運かが分かります。
       <button class="link" id="lm-set">目安を入れる</button></div>`;
     $("lm-set").onclick = openSettings;
   } else {
-    const r = p/100;
-    const stay = Math.pow(1-r, x.hamari) * 100;           // ここまで1回も出ない確率
-    const k90 = Math.ceil(Math.log(0.1)/Math.log(1-r));   // 9割の人が出るまでの周回数
-    const word = stay < 5 ? "かなり不運" : stay < 25 ? "不運" : stay < 50 ? "やや不運" : "ふつう";
-    const color = stay < 5 ? "var(--lose)" : stay < 25 ? "var(--gold)" : "var(--win)";
-    lm.innerHTML = `
-      <div class="card-head"><span class="card-title">運の良し悪し（目安 ${p}%${x.boost && x.prob.b ? "・条件あり" : ""}）</span>
-        <span style="font-weight:800;color:${color}">${word}</span></div>
-      <div class="bar"><i style="width:${Math.max(2, 100-stay)}%;background:${color}"></i></div>
-      <div class="sub">${x.hamari ? `${x.hamari}周続けて出ないのは <b>${stay < 0.1 ? "0.1%未満" : stay.toFixed(stay < 10 ? 1 : 0) + "%"}</b> の人だけ。<br>` : ""}
-      平均 <b>${Math.round(1/r)}</b> 周に1回、9割の人は <b>${k90}</b> 周までに出ます。</div>`;
+    lm.innerHTML = `<div class="card-title">運の良し悪し（いまのハマり ${x.hamari}周）</div>` + rows.map(r=>{
+      const rate = r.p/100;
+      const stay = Math.pow(1-rate, x.hamari) * 100;      // ここまで1回も出ない確率
+      const k90 = Math.ceil(Math.log(0.1)/Math.log(1-rate)); // 9割の人が出るまで
+      const word = stay < 5 ? "かなり不運" : stay < 25 ? "不運" : stay < 50 ? "やや不運" : "ふつう";
+      const color = stay < 5 ? "var(--lose)" : stay < 25 ? "var(--gold)" : "var(--win)";
+      return `<div class="lmrow${r.on ? " on" : ""}">
+        <div class="card-head"><span class="lmlab">${r.label} <b>${r.p}%</b>${r.on ? "（いま）" : ""}</span>
+          <span style="font-weight:800;color:${color}">${word}</span></div>
+        <div class="bar"><i style="width:${Math.max(2, 100-stay)}%;background:${color}"></i></div>
+        <div class="sub">${x.hamari ? `ここまで出ないのは <b>${stay < 0.1 ? "0.1%未満" : stay.toFixed(stay < 10 ? 1 : 0) + "%"}</b> の人だけ。` : ""}平均 <b>${Math.round(1/rate)}</b> 周に1回、9割の人は <b>${k90}</b> 周までに出ます。</div>
+      </div>`;
+    }).join("");
   }
 
   // 統計
